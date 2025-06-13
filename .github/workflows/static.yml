@@ -1,0 +1,483 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Interactive Guide: GAAP for Stock Distributions from LPs</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <!-- Chosen Palette: "Warm Neutral" - A calming palette using beige, slate gray, and a soft teal for accents to create a professional and supportive feel. -->
+    <!-- Application Structure Plan: The application is designed as a guided, step-by-step journey through the transaction lifecycle, from initial investment to final sale. This process-oriented flow is more intuitive for understanding a sequence of accounting events than a static report. A top navigation bar tracks progress, while a central interactive toggle allows the user to select the initial LP accounting method (the most critical decision). This choice dynamically alters all subsequent content (explanations, diagrams, and journal entries), effectively demonstrating the cause-and-effect nature of GAAP rules. This structure was chosen to transform the dense report into an active learning tool, prioritizing user understanding and engagement over a simple presentation of information. -->
+    <!-- Visualization & Content Choices: 
+        - Report Info: Initial LP accounting methods (ASC 323 vs. ASC 321). Goal: Compare & Choose. Viz/Method: Interactive toggle buttons. Interaction: User selection drives the state of the entire app. Justification: This is the most critical user decision point, and a toggle makes the choice clear and central to the experience. Library: HTML/JS.
+        - Report Info: Transaction flow (Distribution, Holding, Sale). Goal: Organize & Guide. Viz/Method: HTML/CSS process flow diagram. Interaction: The active step is highlighted, guiding the user. Justification: Visually represents the accounting lifecycle, making it easier to follow than plain text. Library: Tailwind CSS.
+        - Report Info: Journal Entries. Goal: Inform & Illustrate. Viz/Method: Dynamically generated HTML tables. Interaction: Entries change based on user choices. Justification: Clearly demonstrates the financial statement impact of the selected accounting path. Library: JS.
+        - Report Info: Key Principles. Goal: Summarize. Viz/Method: Donut Chart. Interaction: The chart visually summarizes how accounting choices affect the outcome (e.g., impact on income vs. balance sheet). Justification: Provides a high-level visual summary to reinforce learning. Library: Chart.js.
+    -->
+    <!-- CONFIRMATION: NO SVG graphics used. NO Mermaid JS used. -->
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #f5f5f4; /* Warm Neutral: Stone 100 */
+        }
+        .nav-link {
+            transition: all 0.3s ease;
+        }
+        .nav-link.active {
+            background-color: #0d9488; /* Warm Neutral: Teal 600 */
+            color: white;
+            transform: translateY(-2px);
+            box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
+        }
+        .content-card {
+            background-color: white;
+            border-radius: 0.75rem;
+            box-shadow: 0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -2px rgb(0 0 0 / 0.1);
+            transition: all 0.3s ease;
+        }
+        .choice-btn {
+            transition: all 0.3s ease;
+        }
+        .choice-btn.selected {
+            background-color: #0d9488; /* Teal 600 */
+            color: white;
+            border-color: #0d9488;
+            box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
+        }
+        .flow-step {
+            transition: all 0.3s ease-in-out;
+            border-color: transparent;
+        }
+        .flow-step.active-step {
+            border-color: #0d9488; /* Teal 600 */
+            transform: scale(1.05);
+        }
+        .chart-container {
+            position: relative;
+            width: 100%;
+            max-width: 400px;
+            margin-left: auto;
+            margin-right: auto;
+            height: 300px;
+            max-height: 350px;
+        }
+        @media (min-width: 768px) {
+            .chart-container {
+                height: 350px;
+            }
+        }
+        .journal-table th, .journal-table td {
+            padding: 0.75rem 1rem;
+            text-align: left;
+        }
+        .journal-table th {
+            background-color: #f1f5f9; /* Slate 100 */
+        }
+        .journal-table td.debit {
+            text-align: right;
+            padding-right: 2rem;
+        }
+        .journal-table td.credit {
+            text-align: right;
+        }
+    </style>
+</head>
+<body class="text-slate-700">
+
+    <div class="container mx-auto p-4 md:p-8">
+        
+        <header class="text-center mb-8">
+            <h1 class="text-3xl md:text-4xl font-bold text-slate-800 mb-2">Interactive Guide to Stock Distribution Accounting</h1>
+            <p class="text-lg text-slate-600">Navigate the U.S. GAAP treatment for receiving and selling stock from a Limited Partnership.</p>
+        </header>
+
+        <div id="app-container" class="space-y-8">
+
+            <!-- Step 1: Core Decision -->
+            <section class="content-card p-6 md:p-8">
+                <h2 class="text-2xl font-bold text-slate-800 mb-2">Step 1: The Initial Investment Decision</h2>
+                <p class="text-slate-600 mb-6">The first and most critical step is determining how to account for your investment in the Limited Partnership (LP) fund. This choice dictates the accounting for all subsequent events. Select the method that applies to your situation.</p>
+                <div class="flex flex-col md:flex-row justify-center gap-4">
+                    <button id="btnEquity" class="choice-btn w-full md:w-1/2 p-4 border-2 border-slate-200 rounded-lg text-left hover:bg-teal-50 hover:border-teal-500">
+                        <h3 class="font-bold text-lg text-slate-800">Equity Method (ASC 323)</h3>
+                        <p class="text-sm text-slate-600">Use this if you have **significant influence** over the LP (e.g., >3-5% ownership, board representation, policy-making involvement).</p>
+                    </button>
+                    <button id="btnFairValue" class="choice-btn w-full md:w-1/2 p-4 border-2 border-slate-200 rounded-lg text-left hover:bg-teal-50 hover:border-teal-500">
+                        <h3 class="font-bold text-lg text-slate-800">Fair Value / Measurement Alt. (ASC 321)</h3>
+                        <p class="text-sm text-slate-600">Use this if you do **not** have significant influence. The investment is treated as a standard equity security.</p>
+                    </button>
+                </div>
+            </section>
+            
+            <div id="main-content" class="hidden space-y-8">
+                <!-- Step 2: The Transaction Lifecycle -->
+                <section class="p-6 md:p-8">
+                     <h2 class="text-2xl font-bold text-slate-800 mb-6 text-center">Step 2: Navigating the Transaction Lifecycle</h2>
+                    <div class="flex flex-col md:flex-row items-center justify-center gap-4 md:gap-0">
+                        <div id="flow-receipt" class="flow-step w-full md:w-1/4 p-4 border-b-4 md:border-b-0 md:border-r-4 rounded-lg bg-white shadow-md text-center">
+                            <div class="text-3xl mb-2">📥</div>
+                            <h3 class="font-semibold text-slate-800">A. Distribution Receipt</h3>
+                            <p class="text-xs text-slate-500">The LP distributes stock to you.</p>
+                        </div>
+                         <div class="text-2xl text-slate-400 mx-4 hidden md:block">→</div>
+                        <div id="flow-holding" class="flow-step w-full md:w-1/4 p-4 border-b-4 md:border-b-0 md:border-r-4 rounded-lg bg-white shadow-md text-center">
+                            <div class="text-3xl mb-2">💼</div>
+                            <h3 class="font-semibold text-slate-800">B. Holding the Stock</h3>
+                            <p class="text-xs text-slate-500">Accounting while you own the new stock.</p>
+                        </div>
+                        <div class="text-2xl text-slate-400 mx-4 hidden md:block">→</div>
+                        <div id="flow-sale" class="flow-step w-full md:w-1/4 p-4 rounded-lg bg-white shadow-md text-center">
+                           <div class="text-3xl mb-2">💸</div>
+                           <h3 class="font-semibold text-slate-800">C. Stock Sale</h3>
+                           <p class="text-xs text-slate-500">Recognizing gain or loss.</p>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- Dynamic Content Sections -->
+                <section id="content-receipt" class="content-card p-6 md:p-8 space-y-4"></section>
+                <section id="content-holding" class="content-card p-6 md:p-8 space-y-4"></section>
+                <section id="content-sale" class="content-card p-6 md:p-8 space-y-4"></section>
+
+                <!-- Step 3: Summary and Journal Entries -->
+                <section class="content-card p-6 md:p-8">
+                    <h2 class="text-2xl font-bold text-slate-800 mb-6 text-center">Step 3: Financial Statement Impact</h2>
+                    <div class="flex flex-col md:flex-row gap-8 items-center">
+                        <div class="w-full md:w-1/2">
+                            <h3 class="text-xl font-semibold text-slate-800 mb-4">Illustrative Journal Entries</h3>
+                            <p class="text-slate-600 mb-4">Based on your selections, here's how these events would be recorded on the books. This assumes a $20,000 fair value for the distributed stock.</p>
+                            <div id="journal-entries" class="space-y-6"></div>
+                        </div>
+                        <div class="w-full md:w-1/2">
+                             <h3 class="text-xl font-semibold text-slate-800 mb-4 text-center">Decision Impact Summary</h3>
+                            <div class="chart-container">
+                                <canvas id="summaryChart"></canvas>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+            </div>
+
+        </div>
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            const appState = {
+                lpMethod: null, 
+                view: 'receipt'
+            };
+
+            const btnEquity = document.getElementById('btnEquity');
+            const btnFairValue = document.getElementById('btnFairValue');
+            const mainContent = document.getElementById('main-content');
+
+            const contentReceipt = document.getElementById('content-receipt');
+            const contentHolding = document.getElementById('content-holding');
+            const contentSale = document.getElementById('content-sale');
+            const journalEntries = document.getElementById('journal-entries');
+
+            const flowReceipt = document.getElementById('flow-receipt');
+            const flowHolding = document.getElementById('flow-holding');
+            const flowSale = document.getElementById('flow-sale');
+            
+            let summaryChart = null;
+
+            const content = {
+                receipt: {
+                    equity: {
+                        title: 'A. Accounting for the Distribution Receipt (Equity Method)',
+                        text: `
+                            <p class="text-slate-600">Under the Equity Method (ASC 323), the stock distribution is treated as a <strong>return OF your investment</strong>. It is not recognized as income.</p>
+                            <ul class="list-disc list-inside space-y-2 text-slate-600 mt-4">
+                                <li>The new stock you receive is recorded as an asset at its <strong>Fair Value</strong> on the distribution date.</li>
+                                <li>The carrying value of your 'Investment in LP' account is <strong>decreased</strong> by the same fair value amount.</li>
+                                <li>This reflects that assets have moved from the LP to you, reducing your claim on the LP's net assets.</li>
+                                <li><strong>Key consideration:</strong> If the distribution's fair value exceeds your investment's carrying amount, you may need to recognize a gain. This is a complex area requiring careful judgment.</li>
+                            </ul>
+                        `
+                    },
+                    fairValue: {
+                        title: 'A. Accounting for the Distribution Receipt (Fair Value Method)',
+                        text: `
+                            <p class="text-slate-600">Under ASC 321, you must first determine the nature of the distribution. This requires judgment based on information from the LP.</p>
+                            <ul class="list-disc list-inside space-y-2 text-slate-600 mt-4">
+                                <li><strong>If it's a 'Return of Capital':</strong> The treatment is similar to the equity method. You record the new stock at its Fair Value and reduce the carrying amount of your LP investment by the same amount.</li>
+                                <li><strong>If it's 'Dividend Income':</strong> You record the new stock at its Fair Value and recognize <strong>Dividend Income</strong> on your income statement for the same amount.</li>
+                                <li>This distinction is crucial as it directly impacts your net income for the period. For this guide, we will assume it's treated as a return of capital.</li>
+                            </ul>
+                        `
+                    }
+                },
+                holding: {
+                    title: 'B. Subsequent Accounting for the Held Stock (ASC 321)',
+                    text: `
+                        <p class="text-slate-600">Once on your books, the new stock is an equity security governed by ASC 321. Its accounting depends on whether it has a "readily determinable fair value" (e.g., is it publicly traded?).</p>
+                        <ul class="list-disc list-inside space-y-2 text-slate-600 mt-4">
+                           <li><strong>If YES (Publicly Traded):</strong> You must measure the stock at <strong>Fair Value through Net Income (FVTNI)</strong>. At each reporting date, you'll adjust its carrying value to the current market price and recognize any unrealized gain or loss in your net income.</li>
+                           <li><strong>If NO (Private Stock):</strong> You can elect the <strong>"Measurement Alternative"</strong>. You carry the stock at its initial cost, only adjusting it for any impairment losses or observable price changes from new financing rounds. This reduces income statement volatility but requires diligent monitoring.</li>
+                        </ul>
+                    `
+                },
+                sale: {
+                    title: 'C. Accounting for the Subsequent Stock Sale',
+                    text: `
+                         <p class="text-slate-600">When you sell the stock, you will recognize a realized gain or loss in net income. The calculation is straightforward: </p>
+                         <div class="my-4 p-4 bg-slate-50 rounded-lg text-center">
+                            <p class="text-lg font-mono">Sale Proceeds - Carrying Amount of Stock = Realized Gain / Loss</p>
+                         </div>
+                         <p class="text-slate-600">The "Carrying Amount" depends on the choices made in the previous steps:</p>
+                         <ul class="list-disc list-inside space-y-2 text-slate-600 mt-4">
+                            <li>If you used <strong>FVTNI</strong>, the carrying amount is the stock's most recent fair value from your balance sheet.</li>
+                            <li>If you used the <strong>Measurement Alternative</strong>, the carrying amount is its initial cost, adjusted for any impairments or observable transactions.</li>
+                         </ul>
+                    `
+                },
+                journal: {
+                    equity: {
+                        receipt: `
+                            <div class="border rounded-lg overflow-hidden">
+                                <table class="w-full text-sm journal-table">
+                                    <thead><tr><th>Account</th><th class="text-right pr-8">Debit</th><th class="text-right">Credit</th></tr></thead>
+                                    <tbody>
+                                        <tr class="border-b"><td class="font-medium text-slate-700">Investment in New Stock</td><td class="debit">$20,000</td><td class="credit"></td></tr>
+                                        <tr class="border-b"><td class="pl-6 text-slate-600">Investment in LP Fund</td><td class="debit"></td><td class="credit">$20,000</td></tr>
+                                        <tr><td colspan="3" class="bg-slate-50 text-xs text-slate-500 italic p-2">To record stock distribution as a return of investment.</td></tr>
+                                    </tbody>
+                                </table>
+                            </div>`,
+                        sale: `
+                             <div class="border rounded-lg overflow-hidden mt-4">
+                                <table class="w-full text-sm journal-table">
+                                    <thead><tr><th>Account</th><th class="text-right pr-8">Debit</th><th class="text-right">Credit</th></tr></thead>
+                                    <tbody>
+                                        <tr class="border-b"><td class="font-medium text-slate-700">Cash</td><td class="debit">$25,000</td><td class="credit"></td></tr>
+                                        <tr class="border-b"><td class="pl-6 text-slate-600">Investment in New Stock</td><td class="debit"></td><td class="credit">$22,000</td></tr>
+                                        <tr class="border-b"><td class="pl-6 text-slate-600">Realized Gain on Sale</td><td class="debit"></td><td class="credit">$3,000</td></tr>
+                                        <tr><td colspan="3" class="bg-slate-50 text-xs text-slate-500 italic p-2">To record sale of stock (assuming a $2,000 FV increase while held).</td></tr>
+                                    </tbody>
+                                </table>
+                            </div>
+                        `
+                    },
+                    fairValue: {
+                         receipt: `
+                            <div class="border rounded-lg overflow-hidden">
+                                <table class="w-full text-sm journal-table">
+                                    <thead><tr><th>Account</th><th class="text-right pr-8">Debit</th><th class="text-right">Credit</th></tr></thead>
+                                    <tbody>
+                                        <tr class="border-b"><td class="font-medium text-slate-700">Investment in New Stock</td><td class="debit">$20,000</td><td class="credit"></td></tr>
+                                        <tr class="border-b"><td class="pl-6 text-slate-600">Investment in LP Fund <br><span class="text-xs italic">(If Return of Capital)</span></td><td class="debit"></td><td class="credit">$20,000</td></tr>
+                                        <tr class="border-b bg-slate-50"><td colspan="3" class="text-center font-semibold">OR</td></tr>
+                                        <tr class="border-b"><td class="pl-6 text-slate-600">Dividend Income <br><span class="text-xs italic">(If Dividend)</span></td><td class="debit"></td><td class="credit">$20,000</td></tr>
+                                        <tr><td colspan="3" class="bg-slate-50 text-xs text-slate-500 italic p-2">To record stock distribution, depending on its nature.</td></tr>
+                                    </tbody>
+                                </table>
+                            </div>
+                        `,
+                        sale: `
+                            <div class="border rounded-lg overflow-hidden mt-4">
+                                <table class="w-full text-sm journal-table">
+                                    <thead><tr><th>Account</th><th class="text-right pr-8">Debit</th><th class="text-right">Credit</th></tr></thead>
+                                    <tbody>
+                                        <tr class="border-b"><td class="font-medium text-slate-700">Cash</td><td class="debit">$25,000</td><td class="credit"></td></tr>
+                                        <tr class="border-b"><td class="pl-6 text-slate-600">Investment in New Stock</td><td class="debit"></td><td class="credit">$22,000</td></tr>
+                                        <tr class="border-b"><td class="pl-6 text-slate-600">Realized Gain on Sale</td><td class="debit"></td><td class="credit">$3,000</td></tr>
+                                        <tr><td colspan="3" class="bg-slate-50 text-xs text-slate-500 italic p-2">To record sale of stock (assuming a $2,000 FV increase while held).</td></tr>
+                                    </tbody>
+                                </table>
+                            </div>
+                        `
+                    }
+                }
+            };
+            
+            function updateView() {
+                if (!appState.lpMethod) return;
+
+                mainContent.classList.remove('hidden');
+                
+                // Update flow highlight
+                [flowReceipt, flowHolding, flowSale].forEach(el => el.classList.remove('active-step'));
+                const activeFlow = document.getElementById(`flow-${appState.view}`);
+                if(activeFlow) activeFlow.classList.add('active-step');
+
+                // Update content
+                const receiptData = appState.lpMethod === 'equity' ? content.receipt.equity : content.receipt.fairValue;
+                contentReceipt.innerHTML = `
+                    <h3 class="text-xl font-semibold text-slate-800">${receiptData.title}</h3>
+                    ${receiptData.text}
+                `;
+
+                contentHolding.innerHTML = `
+                    <h3 class="text-xl font-semibold text-slate-800">${content.holding.title}</h3>
+                    ${content.holding.text}
+                `;
+                contentSale.innerHTML = `
+                    <h3 class="text-xl font-semibold text-slate-800">${content.sale.title}</h3>
+                    ${content.sale.text}
+                `;
+
+                // Update Journal Entries
+                const journalData = appState.lpMethod === 'equity' ? content.journal.equity : content.journal.fairValue;
+                journalEntries.innerHTML = `
+                    <h4 class="font-semibold text-slate-700">1. On Receipt of Stock:</h4>
+                    ${journalData.receipt}
+                    <h4 class="font-semibold text-slate-700 mt-6">2. On Sale of Stock:</h4>
+                    ${journalData.sale}
+                `;
+                
+                updateChart();
+            }
+            
+            function createChart() {
+                 const ctx = document.getElementById('summaryChart').getContext('2d');
+                 summaryChart = new Chart(ctx, {
+                    type: 'doughnut',
+                    data: {
+                        labels: [],
+                        datasets: [{
+                            label: 'Impact Area',
+                            data: [],
+                            backgroundColor: [
+                                'rgba(13, 148, 136, 0.7)', // Teal 600
+                                'rgba(245, 158, 11, 0.7)', // Amber 500
+                                'rgba(59, 130, 246, 0.7)'  // Blue 500
+                            ],
+                            borderColor: [
+                                'rgb(13, 148, 136)',
+                                'rgb(245, 158, 11)',
+                                'rgb(59, 130, 246)'
+                            ],
+                            borderWidth: 1
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        plugins: {
+                            legend: {
+                                position: 'top',
+                            },
+                            tooltip: {
+                                callbacks: {
+                                    label: function(context) {
+                                        let label = context.label || '';
+                                        if (label) {
+                                            label += ': ';
+                                        }
+                                        label += context.raw + '%';
+                                        return label;
+                                    }
+                                }
+                            },
+                            title: {
+                                display: true,
+                                text: `Accounting Path: ${appState.lpMethod === 'equity' ? 'Equity Method' : 'Fair Value'}`
+                            }
+                        }
+                    }
+                });
+            }
+            
+            function updateChart() {
+                if (!summaryChart) {
+                    createChart();
+                }
+
+                let chartData, chartLabels, chartTitle;
+                if(appState.lpMethod === 'equity') {
+                    chartLabels = ['Balance Sheet Reclass', 'Potential Gain on Sale', 'No Initial P&L Impact'];
+                    chartData = [50, 40, 10];
+                    chartTitle = 'Path: Equity Method (ASC 323)';
+                } else {
+                    chartLabels = ['Potential P&L on Receipt', 'Balance Sheet Impact', 'Potential Gain on Sale'];
+                    chartData = [45, 20, 35];
+                    chartTitle = 'Path: Fair Value (ASC 321)';
+                }
+
+                summaryChart.data.labels = chartLabels;
+                summaryChart.data.datasets[0].data = chartData;
+                summaryChart.options.plugins.title.text = chartTitle;
+                summaryChart.update();
+            }
+
+
+            btnEquity.addEventListener('click', () => {
+                appState.lpMethod = 'equity';
+                btnEquity.classList.add('selected');
+                btnFairValue.classList.remove('selected');
+                updateView();
+            });
+
+            btnFairValue.addEventListener('click', () => {
+                appState.lpMethod = 'fairValue';
+                btnFairValue.classList.add('selected');
+                btnEquity.classList.remove('selected');
+                updateView();
+            });
+            
+            [flowReceipt, flowHolding, flowSale].forEach(el => {
+                el.addEventListener('click', (e) => {
+                    const view = e.currentTarget.id.split('-')[1];
+                    appState.view = view;
+                    
+                    const targetSection = document.getElementById(`content-${view}`);
+                    if(targetSection) {
+                        targetSection.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                    }
+                    
+                    // Update highlight
+                    [flowReceipt, flowHolding, flowSale].forEach(f => f.classList.remove('active-step'));
+                    e.currentTarget.classList.add('active-step');
+                });
+            });
+        });
+    </script>
+
+</body>
+</html>
+# Simple workflow for deploying static content to GitHub Pages
+name: Deploy static content to Pages
+
+on:
+  # Runs on pushes targeting the default branch
+  push:
+    branches: ["main"]
+
+  # Allows you to run this workflow manually from the Actions tab
+  workflow_dispatch:
+
+# Sets permissions of the GITHUB_TOKEN to allow deployment to GitHub Pages
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+# Allow only one concurrent deployment, skipping runs queued between the run in-progress and latest queued.
+# However, do NOT cancel in-progress runs as we want to allow these production deployments to complete.
+concurrency:
+  group: "pages"
+  cancel-in-progress: false
+
+jobs:
+  # Single deploy job since we're just deploying
+  deploy:
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Setup Pages
+        uses: actions/configure-pages@v5
+      - name: Upload artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          # Upload entire repository
+          path: '.'
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
